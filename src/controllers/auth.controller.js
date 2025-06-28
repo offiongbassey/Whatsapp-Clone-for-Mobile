@@ -7,54 +7,89 @@ import { responseHandler } from "../helpers/responseHandler.js";
 import { errorHandler } from "../helpers/errorHandler.js";
 import UserModel from "../models/userModel.js";
 import bcrypt from "bcrypt";
+import crypto from 'crypto'; // or const crypto = require('crypto');
+import Token from "../models/token.js"
+import { generateNumericToken } from "../utils/generateCode.js";
 
-export const register = async(req, res) => {
+export const register = async (req, res) => {
     try {
-        
-        const { name, phone, email, picture, status, password } = req.body;
-        console.log("data", req.body);
-        const new_user = await createUser({
-            name,
-            phone,
-            email,
-            picture,
-            status, 
-            password
-        });
-
-        const access_token = await generateToken(
-            { userId: new_user._id }, 
-            "30d", 
-            process.env.ACCESS_TOKEN_SECRET);
-
-        const refresh_token = await generateToken(
-            { userId: new_user._id },
-            "30d",
-            process.env.REFRESH_TOKEN_SECRET
-        );
-
-        res.cookie('refreshToken', refresh_token, {
-            httpOnly: true,
-            path: "/api/v1/auth/refreshtoken",
-            maxAge: 30 * 24 * 60 * 60 * 1000, //30 days
-        });
-
-        const user = {
-            _id: new_user._id,
-            name: new_user.name,
-            phone: new_user.phone,
-            email: new_user.email,
-            picture: new_user.picture,
-            status: new_user.status,
-            token: access_token
-        }
-        return responseHandler(res, 201, true, "Account Successfully Created", user);
-        
+      const { phone } = req.body;
+      const new_user = await createUser({ phone, type: 'verify_phone' });
+  
+      const rawToken = generateNumericToken();
+  
+      // Hash the token for storage
+      const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  
+      await Token.create({
+        userId: new_user._id,
+        token: hashedToken,
+        type: 'verify_phone',
+        expiresAt: new Date(Date.now() + 1000 * 60 * 30), // 30 mins expiry
+      });
+  
+      // Optionally send rawToken to user via SMS/Email
+      // Example: sendSMS(phone, `Your verification code: ${rawToken}`)
+      console.log(`Your verification code: ${rawToken}`);
+  
+      const user = {
+        _id: new_user._id,
+        phone: new_user.phone,
+      };
+  
+      return responseHandler(res, 201, true, "Account Successfully Created", {
+        user,
+        verificationToken: rawToken, // ⚠️ send only via secure channels
+      });
     } catch (error) {
-        await errorHandler(error);
-        return responseHandler(res, 500, false, "Something went wrong, try again later");
+      await errorHandler(error);
+      return responseHandler(res, 500, false, "Something went wrong, try again later");
     }
-}
+  };
+
+
+  export const verify_signup = async (req, res) => {
+    try {
+      const { token, phone } = req.body;
+  
+      // Hash the token sent by user
+      const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  
+      // Find token entry
+      const storedToken = await Token.findOne({
+        token: hashedToken,
+        type: 'verify_phone',
+        expiresAt: { $gt: Date.now() }, // not expired
+      });
+  
+      if (!storedToken) {
+        return responseHandler(res, 400, false, "Invalid or expired token");
+      }
+  
+      // Find and update the user
+      const user = await UserModel.findOneAndUpdate(
+        { _id: storedToken.userId, phone },
+        { is_verified: true },
+        { new: true }
+      );
+  
+      if (!user) {
+        return responseHandler(res, 404, false, "User not found");
+      }
+  
+      // Optionally delete the token
+      await Token.deleteOne({ _id: storedToken._id });
+  
+      return responseHandler(res, 200, true, "Phone verified successfully", {
+        userId: user._id,
+        phone: user.phone,
+        is_verified: user.is_verified,
+      });
+    } catch (error) {
+      await errorHandler(error);
+      return responseHandler(res, 500, false, "Something went wrong");
+    }
+  };
  
 export const login = async (req, res) => {
     try {

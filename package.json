@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node --es-module-specifier-resolution=node ./src/index.js",
-    "dev": "nodemon --exec babel-node ./src/index.js"
+"dev": "nodemon --exec 'node --es-module-specifier-resolution=node --loader=@babel/register' ./src/index.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

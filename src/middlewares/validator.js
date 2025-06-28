@@ -1,14 +1,7 @@
 import { body, param } from "express-validator";
-import { checkAllowedFields, titleCase, verifyEmail, verifyPhone } from "../helpers/validation";
+import { checkAllowedFields, titleCase, verifyEmail, verifyPhone } from "../helpers/validation.js";
 
 export const signup_validator = [
-    body('name')
-        .exists()
-        .withMessage("Name is required")
-        .isLength({ min: 5})
-        .withMessage("Name must be atleast 5 characters")
-        .trim()
-        .customSanitizer(titleCase),
     body('phone')
         .exists()
         .withMessage("Phone Number is required")
@@ -17,22 +10,29 @@ export const signup_validator = [
         .isLength({ min: 11 })
         .withMessage("Phone Number must be at least 11 digits")
         .custom(verifyPhone),
-    body('email')
-        .exists()
-        .withMessage("Email is required")
-        .notEmpty()
-        .withMessage("Email cannot be empty")
-        .isEmail()
-        .withMessage("Email is not valid")
-        .custom(verifyEmail)
-        .normalizeEmail(),
-    body('password')
-        .exists()
-        .withMessage("Password is required")
-        .isLength({ min: 7})
-        .withMessage("Password must not be less than 7 characters"),
     body()
-        .custom(body => checkAllowedFields(body, ['name', 'phone', 'email', 'picture', 'status', 'password']))  
+        .custom(body => checkAllowedFields(body, ['phone']))  
+]
+
+export const verify_signup_validator = [
+    body('phone')
+        .exists()
+        .withMessage("Phone Number is required")
+        .notEmpty()
+        .withMessage("Phone Number cannot be empty")
+        .isLength({ min: 11 })
+        .withMessage("Phone Number must be at least 11 digits"),
+    body("token")
+        .exists()
+        .withMessage("Token is required")
+        .notEmpty()
+        .withMessage("Token cannot be empty")
+        .isLength({ min: 6, max: 6})
+        .withMessage("Token must be at least 11 digits")
+        .isInt()
+        .withMessage("Token must be digit"),
+    body()
+        .custom(body => checkAllowedFields(body, ['phone', 'token']))  
 ]
 
 export const login_validator = [

@@ -1,6 +1,6 @@
 import { validationResult } from "express-validator";
-import { responseHandler } from "./responseHandler";
-import { UserModel } from "../models";
+import { responseHandler } from "./responseHandler.js";
+import { UserModel } from "../models/index.js";
 
 export const checkAllowedFields = (payload, fields) => {
     payload = Array.isArray(payload) ? payload : [payload];
